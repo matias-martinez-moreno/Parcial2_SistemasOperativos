@@ -11,7 +11,7 @@
  * - NO interviene en el envío de mensajes de chat entre usuarios.
  */
 
- #include <stdio.hh>
+ #include <stdio.h>
  #include <stdlib.h>
  #include <string.h>
  #include <sys/types.h>
