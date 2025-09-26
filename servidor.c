@@ -144,8 +144,82 @@
   * @return El índice de la sala en el array global, o -1 si hay error.
   */
  int crear_sala(const char *nombre) {
-     if (num_salas >= MAX_SALAS) return -1;
+     if (num_salas >= MAX_SALAS) {
+         return -1;
+     }
      key_t key = ftok("/tmp", num_salas + 1);
      int cola_id = msgget(key, IPC_CREAT | 0666);
-     if (cola_id == -1) return -1;
-     strcpy(salas[num_salas
+     if (cola_id == -1) {
+         return -1;
+     }
+     strcpy(salas[num_salas].nombre, nombre);
+     salas[num_salas].cola_id = cola_id;
+     salas[num_salas].num_usuarios = 0;
+     printf("INFO: Sala '%s' creada (ID cola: %d)\n", nombre, cola_id);
+     num_salas++;
+     return num_salas - 1;
+ }
+ 
+ /**
+  * Busca una sala por su nombre.
+  * @param nombre El nombre de la sala a buscar.
+  * @return El índice de la sala si se encuentra, o -1 en caso contrario.
+  */
+ int buscar_sala(const char *nombre) {
+     for (int i = 0; i < num_salas; i++) {
+         if (strcmp(salas[i].nombre, nombre) == 0) {
+             return i;
+         }
+     }
+     return -1;
+ }
+ 
+ /**
+  * Agrega un usuario a la lista de una sala, validando que no esté llena
+  * y que el nombre de usuario no esté ya en uso.
+  * @param indice_sala El índice de la sala.
+  * @param nombre_usuario El nombre del usuario a agregar.
+  * @return 0 si tiene éxito, -1 si hay error.
+  */
+ int agregar_usuario_a_sala(int indice_sala, const char *nombre_usuario) {
+     struct sala *s = &salas[indice_sala];
+     if (s->num_usuarios >= MAX_USUARIOS_POR_SALA) {
+         printf("ERROR: La sala '%s' está llena.\n", s->nombre);
+         return -1;
+     }
+     for (int i = 0; i < s->num_usuarios; i++) {
+         if (strcmp(s->usuarios[i], nombre_usuario) == 0) {
+             printf("ERROR: Usuario '%s' ya existe en la sala '%s'.\n", nombre_usuario, s->nombre);
+             return -1;
+         }
+     }
+     strcpy(s->usuarios[s->num_usuarios], nombre_usuario);
+     s->num_usuarios++;
+     printf("INFO: Usuario '%s' agregado a '%s'\n", nombre_usuario, s->nombre);
+     return 0;
+ }
+ 
+ /**
+  * Remueve a un usuario de la lista de una sala.
+  * @param indice_sala El índice de la sala.
+  * @param nombre_usuario El nombre del usuario a remover.
+  * @return 0 siempre.
+  */
+ int remover_usuario_de_sala(int indice_sala, const char *nombre_usuario) {
+     struct sala *s = &salas[indice_sala];
+     int encontrado = -1;
+     for (int i = 0; i < s->num_usuarios; i++) {
+         if (strcmp(s->usuarios[i], nombre_usuario) == 0) {
+             encontrado = i;
+             break;
+         }
+     }
+     if (encontrado != -1) {
+         for (int i = encontrado; i < s->num_usuarios - 1; i++) {
+             strcpy(s->usuarios[i], s->usuarios[i + 1]);
+         }
+         s->num_usuarios--;
+         printf("INFO: Usuario '%s' removido de '%s'\n", nombre_usuario, s->nombre);
+     }
+     return 0;
+ }
