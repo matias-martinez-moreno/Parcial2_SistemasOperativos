@@ -3,11 +3,13 @@
  *
  * VERSIÓN FINAL, COMPLETA Y COMENTADA
  *
- * Este servidor cumple con la arquitectura del reto, es funcionalmente robusto
- * y está debidamente documentado para facilitar su comprensión y evaluación.
+ * Este servidor cumple con la arquitectura y el ejemplo del reto.
  *
- * Autor: Equipo de Sistemas Operativos (Corregido por Asistente AI)
- * Fecha: 2024
+ * FUNCIONALIDADES:
+ * - Gestiona peticiones administrativas (JOIN, LIST, etc.) desde la cola global.
+ * - RECIBE mensajes de chat (mtype=3) desde la cola global.
+ * - REENVÍA los mensajes de chat a la cola de la sala correspondiente para que
+ *   todos los miembros (incluido el remitente) lo reciban.
  */
 
  #include <stdio.h>
@@ -23,7 +25,6 @@
  #define MAX_TEXTO 256
  #define MAX_NOMBRE 50
  
- // Estructura para los mensajes (unificada para peticiones y chat)
  struct mensaje {
      long mtype;
      char remitente[MAX_NOMBRE];
@@ -31,7 +32,6 @@
      char sala[MAX_NOMBRE];
  };
  
- // Estructura para una sala de chat
  struct sala {
      char nombre[MAX_NOMBRE];
      int cola_id;
@@ -42,17 +42,17 @@
  struct sala salas[MAX_SALAS];
  int num_salas = 0;
  
- // Prototipos de funciones auxiliares
+ // Prototipos
  int crear_sala(const char *nombre);
  int buscar_sala(const char *nombre);
  int agregar_usuario_a_sala(int indice_sala, const char *nombre_usuario);
  int remover_usuario_de_sala(int indice_sala, const char *nombre_usuario);
+ void enviar_a_todos_en_sala(int indice_sala, struct mensaje *msg);
  
  /**
   * Función principal del servidor.
   * Se encarga de inicializar la cola global y entrar en un bucle infinito
-  * para atender las peticiones administrativas de los clientes (JOIN, LIST, etc.).
-  * No interviene en el flujo de mensajes de chat entre usuarios.
+  * para atender las peticiones de los clientes.
   */
  int main() {
      key_t key_global = ftok("/tmp", 'A');
@@ -61,28 +61,25 @@
          perror("Error al crear la cola global");
          exit(1);
      }
-     printf("✅ Servidor de chat iniciado. Esperando clientes...\n\n");
+     
+     printf("Servidor de chat iniciado. Esperando clientes...\n");
  
      struct mensaje msg;
  
      while (1) {
-         // Esperar una petición en la cola global
+         // Esperar cualquier tipo de mensaje en la cola global
          if (msgrcv(cola_global, &msg, sizeof(struct mensaje) - sizeof(long), 0, 0) == -1) {
-             perror("Error al recibir mensaje de la cola global");
+             perror("Error al recibir mensaje");
              continue;
          }
  
-         long tipo_peticion = msg.mtype;
-         msg.mtype = 2; // Todas las respuestas del servidor al cliente usan mtype = 2
- 
-         switch (tipo_peticion) {
+         switch (msg.mtype) {
              case 1: { // JOIN
-                 printf("[PETICION] JOIN a '%s' por '%s'\n", msg.sala, msg.remitente);
+                 msg.mtype = 2; // Preparar respuesta
                  int indice_sala = buscar_sala(msg.sala);
                  if (indice_sala == -1) {
                      indice_sala = crear_sala(msg.sala);
                  }
- 
                  if (indice_sala != -1 && agregar_usuario_a_sala(indice_sala, msg.remitente) == 0) {
                      sprintf(msg.texto, "%d", salas[indice_sala].cola_id);
                  } else {
@@ -91,10 +88,17 @@
                  msgsnd(cola_global, &msg, sizeof(struct mensaje) - sizeof(long), 0);
                  break;
              }
+             case 3: { // MSG - El servidor recibe y reenvía
+                 int indice_sala = buscar_sala(msg.sala);
+                 if (indice_sala != -1) {
+                     enviar_a_todos_en_sala(indice_sala, &msg);
+                 }
+                 break;
+             }
              case 4: { // LIST_SALAS
-                 printf("[PETICION] LIST_SALAS por '%s'\n", msg.remitente);
+                 msg.mtype = 2;
                  if (num_salas == 0) {
-                     strcpy(msg.texto, "No hay salas activas en este momento.");
+                     strcpy(msg.texto, "No hay salas activas.");
                  } else {
                      strcpy(msg.texto, "Salas disponibles:");
                      for (int i = 0; i < num_salas; i++) {
@@ -107,7 +111,7 @@
                  break;
              }
              case 5: { // LIST_USERS
-                 printf("[PETICION] LIST_USERS en '%s' por '%s'\n", msg.sala, msg.remitente);
+                 msg.mtype = 2;
                  int indice_sala = buscar_sala(msg.sala);
                  if (indice_sala != -1) {
                      struct sala *s = &salas[indice_sala];
@@ -123,7 +127,7 @@
                  break;
              }
              case 6: { // LEAVE
-                 printf("[PETICION] LEAVE de '%s' por '%s'\n", msg.sala, msg.remitente);
+                 msg.mtype = 2;
                  int indice_sala = buscar_sala(msg.sala);
                  if (indice_sala != -1) {
                      remover_usuario_de_sala(indice_sala, msg.remitente);
@@ -133,9 +137,20 @@
                  break;
              }
          }
-         printf("---\n");
      }
      return 0;
+ }
+ 
+ /**
+  * Reenvía un mensaje a la cola de una sala específica.
+  * @param indice_sala El índice de la sala.
+  * @param msg El mensaje a reenviar.
+  */
+ void enviar_a_todos_en_sala(int indice_sala, struct mensaje *msg) {
+     struct sala *s = &salas[indice_sala];
+     if (msgsnd(s->cola_id, msg, sizeof(struct mensaje) - sizeof(long), 0) == -1) {
+         perror("Error al reenviar mensaje a la sala");
+     }
  }
  
  /**
@@ -144,18 +159,13 @@
   * @return El índice de la sala en el array global, o -1 si hay error.
   */
  int crear_sala(const char *nombre) {
-     if (num_salas >= MAX_SALAS) {
-         return -1;
-     }
+     if (num_salas >= MAX_SALAS) return -1;
      key_t key = ftok("/tmp", num_salas + 1);
      int cola_id = msgget(key, IPC_CREAT | 0666);
-     if (cola_id == -1) {
-         return -1;
-     }
+     if (cola_id == -1) return -1;
      strcpy(salas[num_salas].nombre, nombre);
      salas[num_salas].cola_id = cola_id;
      salas[num_salas].num_usuarios = 0;
-     printf("INFO: Sala '%s' creada (ID cola: %d)\n", nombre, cola_id);
      num_salas++;
      return num_salas - 1;
  }
@@ -167,9 +177,7 @@
   */
  int buscar_sala(const char *nombre) {
      for (int i = 0; i < num_salas; i++) {
-         if (strcmp(salas[i].nombre, nombre) == 0) {
-             return i;
-         }
+         if (strcmp(salas[i].nombre, nombre) == 0) return i;
      }
      return -1;
  }
@@ -183,19 +191,12 @@
   */
  int agregar_usuario_a_sala(int indice_sala, const char *nombre_usuario) {
      struct sala *s = &salas[indice_sala];
-     if (s->num_usuarios >= MAX_USUARIOS_POR_SALA) {
-         printf("ERROR: La sala '%s' está llena.\n", s->nombre);
-         return -1;
-     }
+     if (s->num_usuarios >= MAX_USUARIOS_POR_SALA) return -1;
      for (int i = 0; i < s->num_usuarios; i++) {
-         if (strcmp(s->usuarios[i], nombre_usuario) == 0) {
-             printf("ERROR: Usuario '%s' ya existe en la sala '%s'.\n", nombre_usuario, s->nombre);
-             return -1;
-         }
+         if (strcmp(s->usuarios[i], nombre_usuario) == 0) return -1;
      }
      strcpy(s->usuarios[s->num_usuarios], nombre_usuario);
      s->num_usuarios++;
-     printf("INFO: Usuario '%s' agregado a '%s'\n", nombre_usuario, s->nombre);
      return 0;
  }
  
@@ -219,7 +220,6 @@
              strcpy(s->usuarios[i], s->usuarios[i + 1]);
          }
          s->num_usuarios--;
-         printf("INFO: Usuario '%s' removido de '%s'\n", nombre_usuario, s->nombre);
      }
      return 0;
  }
