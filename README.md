@@ -35,7 +35,8 @@
 # cd ~/Reto2
 # sudo apt update
 # sudo apt install -y build-essential libc6-dev linux-libc-dev
-# make clean && make
+# make clean 
+# make
 
 # ▶️ Ejecución
 
@@ -118,3 +119,4 @@
 # - Sincronización entre hilos
 # - Comunicación entre múltiples clientes
 # - Persistencia de mensajes
+
