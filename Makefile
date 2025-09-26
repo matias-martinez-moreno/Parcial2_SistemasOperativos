@@ -1,21 +1,33 @@
-CFLAGS = -O2 -Wall -Wextra -pthread
+# Makefile para el sistema de chat con colas de mensajes
+CC = gcc
+CFLAGS = -Wall -Wextra -std=c99 -pthread
 LDFLAGS = -pthread
 
-INCS = -Iinclude
+# Objetivos principales
+all: servidor cliente
 
-SRV_OBJS = src/server.o src/rooms.o src/commands.o src/persistence.o src/util.o
-CLI_OBJS = client/client.o src/util.o
+# Compilar el servidor
+servidor: servidor.c
+	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
 
-all: server client_app
+# Compilar el cliente
+cliente: cliente.c
+	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
 
-server: $(SRV_OBJS)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
-
-client_app: $(CLI_OBJS)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
-
-%.o: %.c
-	$(CC) $(CFLAGS) $(INCS) -c -o $@ $<
-
+# Limpiar archivos compilados
 clean:
-	rm -f server client_app $(SRV_OBJS) $(CLI_OBJS)
+	rm -f servidor cliente *.o
+
+# Limpiar colas de mensajes del sistema
+clean-queues:
+	ipcs -q | grep $(whoami) | awk '{print $$2}' | xargs -r ipcrm -q
+
+# Limpiar todo (binarios y colas)
+clean-all: clean clean-queues
+
+# Instalar dependencias
+install-deps:
+	sudo apt update
+	sudo apt install -y build-essential
+
+.PHONY: all clean clean-queues clean-all install-deps
