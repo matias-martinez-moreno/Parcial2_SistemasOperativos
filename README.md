@@ -328,12 +328,9 @@ pkill servidor
 4. **Prueba usuarios**: Intentar agregar más de 20 usuarios por sala
 
 ## 👥 Autores del Proyecto
-
-| Nombre | Rol | Contribución |
-|--------|-----|--------------|
-| **Matias Martinez** | Desarrollador Principal | Implementación del servidor y cliente |
-| **Sofia Gallo** | Desarrolladora | Documentación y pruebas |
-| **Juan Manuel Gallo** | Desarrollador | Optimización y debugging |
+**Matias Martinez** 
+**Sofia Gallo**
+ **Juan Manuel Gallo** 
 
 ## 📝 Notas de Implementación
 
