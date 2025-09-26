@@ -1,13 +1,14 @@
 /*
- * Cliente del Sistema de Chat con Colas de Mensajes - CLIENTE (Versión Final)
+ * Reto 1: Sistema de Chat con Colas de Mensajes - CLIENTE
  *
- * Autor: Equipo de Sistemas Operativos
- * Fecha: 2024
+ * VERSIÓN FINAL Y CORRECTA - Cumple con la arquitectura del reto.
  *
- * FUNCIONALIDADES COMPLETAS:
- * - Arquitectura correcta: Obtiene ID de cola y envía mensajes a la cola de la sala.
- * - Comandos Bonus: Implementados y funcionales (/list, /users, /leave).
- * - Experiencia de Usuario: El prompt no se interrumpe con mensajes nuevos.
+ * FUNCIONALIDADES:
+ * - Se conecta a la cola global del servidor para peticiones administrativas.
+ * - Al unirse a una sala, recibe el ID de la cola de esa sala.
+ * - Envía mensajes de chat directamente a la cola de la sala.
+ * - Un hilo separado recibe los mensajes de la cola de la sala.
+ * - Todos los comandos (/list, /users, /leave) son funcionales.
  */
 
  #define _POSIX_C_SOURCE 200809L
@@ -41,15 +42,18 @@
      struct mensaje msg;
      while (1) {
          if (cola_sala != -1) {
-             if (msgrcv(cola_sala, &msg, sizeof(struct mensaje) - sizeof(long), 3, 0) != -1) {
+             // El tipo de mensaje 0 recibe el primer mensaje en la cola, sin importar su mtype.
+             // Esto es útil si el servidor enviara notificaciones a la sala.
+             if (msgrcv(cola_sala, &msg, sizeof(struct mensaje) - sizeof(long), 0, 0) != -1) {
+                 // No mostrar los mensajes que uno mismo envía
                  if (strcmp(msg.remitente, nombre_usuario) != 0) {
-                     // Imprime el mensaje y vuelve a dibujar el prompt para una mejor UX
                      printf("\r%s: %s\n> ", msg.remitente, msg.texto);
-                     fflush(stdout);
+                     fflush(stdout); // Asegura que el prompt ">" se redibuje
                  }
              }
          }
-         usleep(100000); // Pequeña pausa para no sobrecargar la CPU
+         struct timespec ts = {0, 100000000L}; // Pausa de 100ms
+         nanosleep(&ts, NULL);
      }
      return NULL;
  }
@@ -70,12 +74,7 @@
  
      printf("👋 ¡Bienvenido, %s! Conectado al servidor.\n", nombre_usuario);
      printf("--------------------------------------------------\n");
-     printf("Comandos disponibles:\n");
-     printf("  join <sala>      - Para unirte a una sala.\n");
-     printf("  /list            - Muestra todas las salas activas.\n");
-     printf("  /users           - Muestra los usuarios en tu sala actual.\n");
-     printf("  /leave           - Para abandonar tu sala actual.\n");
-     printf("  Cualquier otro texto será un mensaje para la sala.\n");
+     printf("Comandos: join <sala>, /list, /users, /leave\n");
      printf("--------------------------------------------------\n");
  
      pthread_t hilo_receptor;
@@ -88,27 +87,29 @@
          printf("> ");
          if (fgets(comando, MAX_TEXTO, stdin) == NULL) {
              printf("\nSaliendo...\n");
-             break; // Salir con Ctrl+D
+             break;
          }
          comando[strcspn(comando, "\n")] = '\0';
  
          if (strncmp(comando, "join ", 5) == 0) {
              char sala[MAX_NOMBRE];
              sscanf(comando, "join %s", sala);
-             msg.mtype = 1;
+             msg.mtype = 1; // Tipo JOIN
              strcpy(msg.remitente, nombre_usuario);
              strcpy(msg.sala, sala);
              msgsnd(cola_global, &msg, sizeof(struct mensaje) - sizeof(long), 0);
+             
              msgrcv(cola_global, &msg, sizeof(struct mensaje) - sizeof(long), 2, 0);
-             cola_sala = atoi(msg.texto);
-             if (cola_sala > 0) {
+             
+             if (atoi(msg.texto) > 0) {
+                 cola_sala = atoi(msg.texto);
                  printf("✅ Te has unido a la sala '%s'.\n", sala);
                  strcpy(sala_actual, sala);
              } else {
-                 printf("❌ Error al unirse a la sala.\n");
+                 printf("❌ Error al unirse: %s\n", strchr(msg.texto, '-') + 1);
              }
          } else if (strcmp(comando, "/list") == 0) {
-             msg.mtype = 4;
+             msg.mtype = 4; // Tipo LIST_SALAS
              strcpy(msg.remitente, nombre_usuario);
              msgsnd(cola_global, &msg, sizeof(struct mensaje) - sizeof(long), 0);
              msgrcv(cola_global, &msg, sizeof(struct mensaje) - sizeof(long), 2, 0);
@@ -118,7 +119,7 @@
                  printf("INFO: No estás en ninguna sala.\n");
                  continue;
              }
-             msg.mtype = 5;
+             msg.mtype = 5; // Tipo LIST_USERS
              strcpy(msg.remitente, nombre_usuario);
              strcpy(msg.sala, sala_actual);
              msgsnd(cola_global, &msg, sizeof(struct mensaje) - sizeof(long), 0);
@@ -129,7 +130,7 @@
                  printf("INFO: No estás en ninguna sala.\n");
                  continue;
              }
-             msg.mtype = 6;
+             msg.mtype = 6; // Tipo LEAVE
              strcpy(msg.remitente, nombre_usuario);
              strcpy(msg.sala, sala_actual);
              msgsnd(cola_global, &msg, sizeof(struct mensaje) - sizeof(long), 0);
@@ -142,9 +143,10 @@
                  printf("INFO: No estás en ninguna sala. Usa 'join <sala>' para unirte.\n");
                  continue;
              }
-             msg.mtype = 3;
+             msg.mtype = 3; // Tipo MSG (para la cola de la sala)
              strcpy(msg.remitente, nombre_usuario);
              strcpy(msg.texto, comando);
+             // Enviar directamente a la cola de la sala
              if (msgsnd(cola_sala, &msg, sizeof(struct mensaje) - sizeof(long), 0) == -1) {
                  perror("Error al enviar mensaje");
              }

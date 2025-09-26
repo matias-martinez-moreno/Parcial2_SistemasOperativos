@@ -18,16 +18,11 @@ cliente: cliente.c
 clean:
 	rm -f servidor cliente *.o
 
-# Limpiar colas de mensajes del sistema
+# Limpiar colas de mensajes del sistema (muy útil para desarrollo)
 clean-queues:
-	ipcs -q | grep $(whoami) | awk '{print $$2}' | xargs -r ipcrm -q
+	ipcs -q | grep "$(whoami)" | awk '{print $$2}' | xargs --no-run-if-empty ipcrm -q
 
 # Limpiar todo (binarios y colas)
 clean-all: clean clean-queues
 
-# Instalar dependencias
-install-deps:
-	sudo apt update
-	sudo apt install -y build-essential
-
-.PHONY: all clean clean-queues clean-all install-deps
+.PHONY: all clean clean-queues clean-all

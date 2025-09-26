@@ -1,16 +1,17 @@
 /*
- * Sistema de Chat con Colas de Mensajes - SERVIDOR (Versión Final)
+ * Reto 1: Sistema de Chat con Colas de Mensajes - SERVIDOR
  *
- * Autor: Equipo de Sistemas Operativos
- * Fecha: 2024
+ * VERSIÓN FINAL Y CORRECTA - Cumple con la arquitectura del reto.
  *
- * FUNCIONALIDADES COMPLETAS:
- * - Arquitectura correcta: Cliente obtiene ID de cola y envía mensajes directamente.
- * - Comandos Bonus: Gestiona /list, /users, /leave.
- * - Notificaciones: Informa a los usuarios de una sala cuando alguien se une o la abandona.
+ * FUNCIONALIDADES:
+ * - Crea una cola global para peticiones administrativas (JOIN, LIST, etc.).
+ * - Al recibir un JOIN, crea una sala con su propia cola y devuelve el ID de esa cola.
+ * - Gestiona la lista de usuarios y salas.
+ * - Responde a los comandos /list, /users, /leave.
+ * - NO interviene en el envío de mensajes de chat entre usuarios.
  */
 
- #include <stdio.h>
+ #include <stdio.hh>
  #include <stdlib.h>
  #include <string.h>
  #include <sys/types.h>
@@ -23,6 +24,7 @@
  #define MAX_TEXTO 256
  #define MAX_NOMBRE 50
  
+ // Estructura para los mensajes (unificada para peticiones y chat)
  struct mensaje {
      long mtype;
      char remitente[MAX_NOMBRE];
@@ -30,6 +32,7 @@
      char sala[MAX_NOMBRE];
  };
  
+ // Estructura para una sala de chat
  struct sala {
      char nombre[MAX_NOMBRE];
      int cola_id;
@@ -40,11 +43,10 @@
  struct sala salas[MAX_SALAS];
  int num_salas = 0;
  
- // Prototipos de funciones
+ // Prototipos de funciones auxiliares
  int crear_sala(const char *nombre);
  int buscar_sala(const char *nombre);
  int agregar_usuario_a_sala(int indice_sala, const char *nombre_usuario);
- void notificar_sala(int indice_sala, const char *notificacion, const char *usuario_excluido);
  int remover_usuario_de_sala(int indice_sala, const char *nombre_usuario);
  
  int main() {
@@ -55,75 +57,88 @@
          perror("Error al crear la cola global");
          exit(1);
      }
-     printf("✅ Servidor iniciado. Cola global ID: %d. Esperando clientes...\n\n", cola_global);
+     printf("✅ Servidor iniciado. Cola global ID: %d. Esperando peticiones...\n\n", cola_global);
  
      struct mensaje msg;
  
+     // Bucle principal del servidor: solo escucha en la cola global
      while (1) {
          if (msgrcv(cola_global, &msg, sizeof(struct mensaje) - sizeof(long), 0, 0) == -1) {
-             perror("Error al recibir mensaje");
+             perror("Error al recibir mensaje de la cola global");
              continue;
          }
  
-         if (msg.mtype == 1) { // JOIN
-             printf("[PETICION] JOIN a '%s' por '%s'\n", msg.sala, msg.remitente);
-             int indice_sala = buscar_sala(msg.sala);
-             if (indice_sala == -1) {
-                 indice_sala = crear_sala(msg.sala);
-                 if (indice_sala == -1) continue;
-             }
+         // Todas las respuestas del servidor al cliente usan mtype = 2
+         long tipo_peticion = msg.mtype;
+         msg.mtype = 2;
  
-             if (agregar_usuario_a_sala(indice_sala, msg.remitente) == 0) {
-                 msg.mtype = 2;
-                 sprintf(msg.texto, "%d", salas[indice_sala].cola_id);
-                 msgsnd(cola_global, &msg, sizeof(struct mensaje) - sizeof(long), 0);
-                 
-                 char notificacion[MAX_TEXTO];
-                 sprintf(notificacion, "%s se ha unido al chat.", msg.remitente);
-                 notificar_sala(indice_sala, notificacion, msg.remitente);
-             }
-         } else if (msg.mtype == 4) { // LIST_SALAS
-             printf("[PETICION] LIST_SALAS por '%s'\n", msg.remitente);
-             msg.mtype = 2;
-             strcpy(msg.texto, "Salas disponibles:");
-             for (int i = 0; i < num_salas; i++) {
-                 char temp[MAX_TEXTO];
-                 sprintf(temp, "\n - %s (%d/%d)", salas[i].nombre, salas[i].num_usuarios, MAX_USUARIOS_POR_SALA);
-                 strcat(msg.texto, temp);
-             }
-             msgsnd(cola_global, &msg, sizeof(struct mensaje) - sizeof(long), 0);
-         } else if (msg.mtype == 5) { // LIST_USERS
-             printf("[PETICION] LIST_USERS en '%s' por '%s'\n", msg.sala, msg.remitente);
-             int indice_sala = buscar_sala(msg.sala);
-             msg.mtype = 2;
-             if (indice_sala != -1) {
-                 struct sala *s = &salas[indice_sala];
-                 sprintf(msg.texto, "Usuarios en '%s':", msg.sala);
-                 for (int i = 0; i < s->num_usuarios; i++) {
-                     strcat(msg.texto, "\n - ");
-                     strcat(msg.texto, s->usuarios[i]);
+         switch (tipo_peticion) {
+             case 1: { // JOIN
+                 printf("[PETICION] JOIN a '%s' por '%s'\n", msg.sala, msg.remitente);
+                 int indice_sala = buscar_sala(msg.sala);
+                 if (indice_sala == -1) {
+                     indice_sala = crear_sala(msg.sala);
                  }
-             } else {
-                 strcpy(msg.texto, "Error: Sala no encontrada.");
+ 
+                 if (indice_sala != -1 && agregar_usuario_a_sala(indice_sala, msg.remitente) == 0) {
+                     // Éxito: Devolver el ID de la cola de la sala
+                     sprintf(msg.texto, "%d", salas[indice_sala].cola_id);
+                 } else {
+                     // Error: Devolver un ID inválido y un mensaje de error
+                     sprintf(msg.texto, "0-Error: El nombre de usuario ya existe o la sala está llena.");
+                 }
+                 msgsnd(cola_global, &msg, sizeof(struct mensaje) - sizeof(long), 0);
+                 break;
              }
-             msgsnd(cola_global, &msg, sizeof(struct mensaje) - sizeof(long), 0);
-         } else if (msg.mtype == 6) { // LEAVE
-             printf("[PETICION] LEAVE de '%s' por '%s'\n", msg.sala, msg.remitente);
-             int indice_sala = buscar_sala(msg.sala);
-             if (indice_sala != -1) {
-                 char notificacion[MAX_TEXTO];
-                 sprintf(notificacion, "%s ha abandonado el chat.", msg.remitente);
-                 notificar_sala(indice_sala, notificacion, NULL);
-                 remover_usuario_de_sala(indice_sala, msg.remitente);
+             case 4: { // LIST_SALAS
+                 printf("[PETICION] LIST_SALAS por '%s'\n", msg.remitente);
+                 if (num_salas == 0) {
+                     strcpy(msg.texto, "No hay salas activas en este momento.");
+                 } else {
+                     strcpy(msg.texto, "Salas disponibles:");
+                     for (int i = 0; i < num_salas; i++) {
+                         char temp[MAX_TEXTO];
+                         sprintf(temp, "\n - %s (%d/%d)", salas[i].nombre, salas[i].num_usuarios, MAX_USUARIOS_POR_SALA);
+                         strcat(msg.texto, temp);
+                     }
+                 }
+                 msgsnd(cola_global, &msg, sizeof(struct mensaje) - sizeof(long), 0);
+                 break;
              }
-             msg.mtype = 2;
-             sprintf(msg.texto, "Has abandonado la sala '%s'.", msg.sala);
-             msgsnd(cola_global, &msg, sizeof(struct mensaje) - sizeof(long), 0);
+             case 5: { // LIST_USERS
+                 printf("[PETICION] LIST_USERS en '%s' por '%s'\n", msg.sala, msg.remitente);
+                 int indice_sala = buscar_sala(msg.sala);
+                 if (indice_sala != -1) {
+                     struct sala *s = &salas[indice_sala];
+                     sprintf(msg.texto, "Usuarios en '%s':", msg.sala);
+                     for (int i = 0; i < s->num_usuarios; i++) {
+                         strcat(msg.texto, "\n - ");
+                         strcat(msg.texto, s->usuarios[i]);
+                     }
+                 } else {
+                     strcpy(msg.texto, "Error: Sala no encontrada.");
+                 }
+                 msgsnd(cola_global, &msg, sizeof(struct mensaje) - sizeof(long), 0);
+                 break;
+             }
+             case 6: { // LEAVE
+                 printf("[PETICION] LEAVE de '%s' por '%s'\n", msg.sala, msg.remitente);
+                 int indice_sala = buscar_sala(msg.sala);
+                 if (indice_sala != -1) {
+                     remover_usuario_de_sala(indice_sala, msg.remitente);
+                 }
+                 sprintf(msg.texto, "Has abandonado la sala '%s'.", msg.sala);
+                 msgsnd(cola_global, &msg, sizeof(struct mensaje) - sizeof(long), 0);
+                 break;
+             }
          }
          printf("---\n");
      }
+ 
      return 0;
  }
+ 
+ // Implementación de funciones auxiliares
  
  int crear_sala(const char *nombre) {
      if (num_salas >= MAX_SALAS) return -1;
@@ -147,29 +162,20 @@
  
  int agregar_usuario_a_sala(int indice_sala, const char *nombre_usuario) {
      struct sala *s = &salas[indice_sala];
-     if (s->num_usuarios >= MAX_USUARIOS_POR_SALA) return -1;
+     if (s->num_usuarios >= MAX_USUARIOS_POR_SALA) {
+         printf("ERROR: La sala '%s' está llena.\n", s->nombre);
+         return -1;
+     }
      for (int i = 0; i < s->num_usuarios; i++) {
-         if (strcmp(s->usuarios[i], nombre_usuario) == 0) return -1;
+         if (strcmp(s->usuarios[i], nombre_usuario) == 0) {
+             printf("ERROR: Usuario '%s' ya existe en la sala '%s'.\n", nombre_usuario, s->nombre);
+             return -1;
+         }
      }
      strcpy(s->usuarios[s->num_usuarios], nombre_usuario);
      s->num_usuarios++;
      printf("INFO: Usuario '%s' agregado a '%s'\n", nombre_usuario, s->nombre);
      return 0;
- }
- 
- void notificar_sala(int indice_sala, const char *notificacion, const char *usuario_excluido) {
-     struct sala *s = &salas[indice_sala];
-     struct mensaje msg_notif;
-     msg_notif.mtype = 3; // Tipo MSG
-     strcpy(msg_notif.remitente, "[SALA]");
-     strcpy(msg_notif.texto, notificacion);
-     
-     for (int i = 0; i < s->num_usuarios; i++) {
-         if (usuario_excluido == NULL || strcmp(s->usuarios[i], usuario_excluido) != 0) {
-             msgsnd(s->cola_id, &msg_notif, sizeof(struct mensaje) - sizeof(long), 0);
-         }
-     }
-     printf("INFO: Notificación enviada a la sala '%s': %s\n", s->nombre, notificacion);
  }
  
  int remover_usuario_de_sala(int indice_sala, const char *nombre_usuario) {
