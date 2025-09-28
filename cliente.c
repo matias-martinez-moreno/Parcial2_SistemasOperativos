@@ -44,9 +44,11 @@ void *recibir_mensajes(void *arg) {
         if (cola_sala != -1) {
             // Intentar recibir un mensaje de la cola de la sala
             if (msgrcv(cola_sala, &msg, sizeof(struct mensaje) - sizeof(long), 0, 0) != -1) {
-                // Mostrar el mensaje recibido
-                printf("\r%s: %s\n> ", msg.remitente, msg.texto);
-                fflush(stdout);
+                // Solo mostrar mensajes de otros usuarios (no los propios)
+                if (strcmp(msg.remitente, nombre_usuario) != 0) {
+                    printf("\r%s: %s\n> ", msg.remitente, msg.texto);
+                    fflush(stdout);
+                }
             }
         }
         // Pequeña pausa para no consumir demasiado CPU
