@@ -64,12 +64,25 @@
   * Función principal del cliente.
   * Se conecta a la cola global, inicia el hilo receptor y maneja la entrada del usuario.
   */
- int main(int argc, char *argv[]) {
-     if (argc != 2) {
-         printf("Uso: %s <nombre_usuario>\n", argv[0]);
-         exit(1);
-     }
-     strcpy(nombre_usuario, argv[1]);
+int main(int argc, char *argv[]) {
+    if (argc != 2) {
+        printf("Uso: %s <nombre_usuario>\n", argv[0]);
+        exit(1);
+    }
+    
+    // Validar longitud del nombre de usuario
+    if (strlen(argv[1]) >= MAX_NOMBRE) {
+        printf("Error: El nombre de usuario es demasiado largo (máximo %d caracteres)\n", MAX_NOMBRE - 1);
+        exit(1);
+    }
+    
+    // Validar que el nombre no esté vacío
+    if (strlen(argv[1]) == 0) {
+        printf("Error: El nombre de usuario no puede estar vacío\n");
+        exit(1);
+    }
+    
+    strcpy(nombre_usuario, argv[1]);
  
      key_t key_global = ftok("/tmp", 'A');
      cola_global = msgget(key_global, 0666);
@@ -94,42 +107,92 @@
          }
          comando[strcspn(comando, "\n")] = '\0';
  
-         if (strncmp(comando, "join ", 5) == 0) {
-             char sala[MAX_NOMBRE];
-             sscanf(comando, "join %s", sala);
-             msg.mtype = 1;
-             strcpy(msg.remitente, nombre_usuario);
-             strcpy(msg.sala, sala);
-             msgsnd(cola_global, &msg, sizeof(struct mensaje) - sizeof(long), 0);
-             msgrcv(cola_global, &msg, sizeof(struct mensaje) - sizeof(long), 2, 0);
-             if (atoi(msg.texto) > 0) {
-                 cola_sala = atoi(msg.texto);
-                 printf("Te has unido a la sala: %s\n", sala);
-                 strcpy(sala_actual, sala);
-             } else {
-                 printf("Error al unirse: %s\n", strchr(msg.texto, '-') + 1);
-             }
+        if (strncmp(comando, "join ", 5) == 0) {
+            char sala[MAX_NOMBRE];
+            sscanf(comando, "join %s", sala);
+            msg.mtype = 1;
+            strcpy(msg.remitente, nombre_usuario);
+            strcpy(msg.sala, sala);
+            strcpy(msg.texto, "");
+            
+            if (msgsnd(cola_global, &msg, sizeof(struct mensaje) - sizeof(long), 0) == -1) {
+                perror("Error al enviar solicitud de JOIN");
+                continue;
+            }
+            
+            // Esperar confirmación del servidor
+            if (msgrcv(cola_global, &msg, sizeof(struct mensaje) - sizeof(long), 2, 0) == -1) {
+                perror("Error al recibir confirmación");
+                continue;
+            }
+            
+            // Verificar si la respuesta contiene un ID de cola válido
+            int cola_id = atoi(msg.texto);
+            if (cola_id > 0) {
+                cola_sala = cola_id;
+                printf("Te has unido a la sala: %s\n", sala);
+                strcpy(sala_actual, sala);
+            } else {
+                printf("Error al unirse: %s\n", msg.texto);
+            }
          } else if (strcmp(comando, "/list") == 0) {
              msg.mtype = 4;
              strcpy(msg.remitente, nombre_usuario);
-             msgsnd(cola_global, &msg, sizeof(struct mensaje) - sizeof(long), 0);
-             msgrcv(cola_global, &msg, sizeof(struct mensaje) - sizeof(long), 2, 0);
+             strcpy(msg.sala, "");
+             strcpy(msg.texto, "");
+             
+             if (msgsnd(cola_global, &msg, sizeof(struct mensaje) - sizeof(long), 0) == -1) {
+                 perror("Error al enviar solicitud de lista");
+                 continue;
+             }
+             
+             if (msgrcv(cola_global, &msg, sizeof(struct mensaje) - sizeof(long), 2, 0) == -1) {
+                 perror("Error al recibir lista de salas");
+                 continue;
+             }
+             
              printf("%s\n", msg.texto);
          } else if (strcmp(comando, "/users") == 0) {
-             if (strlen(sala_actual) == 0) { printf("No estás en ninguna sala.\n"); continue; }
+             if (strlen(sala_actual) == 0) { 
+                 printf("No estás en ninguna sala.\n"); 
+                 continue; 
+             }
              msg.mtype = 5;
              strcpy(msg.remitente, nombre_usuario);
              strcpy(msg.sala, sala_actual);
-             msgsnd(cola_global, &msg, sizeof(struct mensaje) - sizeof(long), 0);
-             msgrcv(cola_global, &msg, sizeof(struct mensaje) - sizeof(long), 2, 0);
+             strcpy(msg.texto, "");
+             
+             if (msgsnd(cola_global, &msg, sizeof(struct mensaje) - sizeof(long), 0) == -1) {
+                 perror("Error al enviar solicitud de usuarios");
+                 continue;
+             }
+             
+             if (msgrcv(cola_global, &msg, sizeof(struct mensaje) - sizeof(long), 2, 0) == -1) {
+                 perror("Error al recibir lista de usuarios");
+                 continue;
+             }
+             
              printf("%s\n", msg.texto);
          } else if (strcmp(comando, "/leave") == 0) {
-             if (strlen(sala_actual) == 0) { printf("No estás en ninguna sala.\n"); continue; }
+             if (strlen(sala_actual) == 0) { 
+                 printf("No estás en ninguna sala.\n"); 
+                 continue; 
+             }
              msg.mtype = 6;
              strcpy(msg.remitente, nombre_usuario);
              strcpy(msg.sala, sala_actual);
-             msgsnd(cola_global, &msg, sizeof(struct mensaje) - sizeof(long), 0);
-             msgrcv(cola_global, &msg, sizeof(struct mensaje) - sizeof(long), 2, 0);
+             strcpy(msg.texto, "");
+             
+             if (msgsnd(cola_global, &msg, sizeof(struct mensaje) - sizeof(long), 0) == -1) {
+                 perror("Error al enviar solicitud de salida");
+                 continue;
+             }
+             
+             if (msgrcv(cola_global, &msg, sizeof(struct mensaje) - sizeof(long), 2, 0) == -1) {
+                 perror("Error al recibir confirmación de salida");
+                 continue;
+             }
+             
              printf("%s\n", msg.texto);
              strcpy(sala_actual, "");
              cola_sala = -1;

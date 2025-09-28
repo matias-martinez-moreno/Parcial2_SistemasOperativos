@@ -74,20 +74,37 @@
          }
  
          switch (msg.mtype) {
-             case 1: { // JOIN
-                 msg.mtype = 2; // Preparar respuesta
-                 int indice_sala = buscar_sala(msg.sala);
-                 if (indice_sala == -1) {
-                     indice_sala = crear_sala(msg.sala);
-                 }
-                 if (indice_sala != -1 && agregar_usuario_a_sala(indice_sala, msg.remitente) == 0) {
-                     sprintf(msg.texto, "%d", salas[indice_sala].cola_id);
-                 } else {
-                     sprintf(msg.texto, "0-Error: El nombre de usuario ya existe o la sala está llena.");
-                 }
-                 msgsnd(cola_global, &msg, sizeof(struct mensaje) - sizeof(long), 0);
-                 break;
-             }
+            case 1: { // JOIN
+                printf("Solicitud de JOIN: usuario '%s' quiere unirse a sala '%s'\n", msg.remitente, msg.sala);
+                msg.mtype = 2; // Preparar respuesta
+                int indice_sala = buscar_sala(msg.sala);
+                if (indice_sala == -1) {
+                    printf("Sala '%s' no existe, creándola...\n", msg.sala);
+                    indice_sala = crear_sala(msg.sala);
+                    if (indice_sala == -1) {
+                        printf("Error: No se pudo crear la sala '%s'\n", msg.sala);
+                        sprintf(msg.texto, "0-Error: No se pudo crear la sala.");
+                        msgsnd(cola_global, &msg, sizeof(struct mensaje) - sizeof(long), 0);
+                        break;
+                    }
+                    printf("Sala '%s' creada exitosamente (ID cola: %d)\n", msg.sala, salas[indice_sala].cola_id);
+                } else {
+                    printf("Sala '%s' encontrada (ID cola: %d)\n", msg.sala, salas[indice_sala].cola_id);
+                }
+                
+                int resultado = agregar_usuario_a_sala(indice_sala, msg.remitente);
+                if (resultado == 0) {
+                    printf("Usuario '%s' agregado exitosamente a sala '%s' (usuarios: %d/%d)\n", 
+                           msg.remitente, msg.sala, salas[indice_sala].num_usuarios, MAX_USUARIOS_POR_SALA);
+                    sprintf(msg.texto, "%d", salas[indice_sala].cola_id);
+                } else {
+                    printf("Error: No se pudo agregar usuario '%s' a sala '%s' (código error: %d)\n", 
+                           msg.remitente, msg.sala, resultado);
+                    sprintf(msg.texto, "0-Error: El nombre de usuario ya existe o la sala está llena.");
+                }
+                msgsnd(cola_global, &msg, sizeof(struct mensaje) - sizeof(long), 0);
+                break;
+            }
              case 3: { // MSG - El servidor recibe y reenvía
                  int indice_sala = buscar_sala(msg.sala);
                  if (indice_sala != -1) {
@@ -141,17 +158,20 @@
      return 0;
  }
  
- /**
-  * Reenvía un mensaje a la cola de una sala específica.
-  * @param indice_sala El índice de la sala.
-  * @param msg El mensaje a reenviar.
-  */
- void enviar_a_todos_en_sala(int indice_sala, struct mensaje *msg) {
-     struct sala *s = &salas[indice_sala];
-     if (msgsnd(s->cola_id, msg, sizeof(struct mensaje) - sizeof(long), 0) == -1) {
-         perror("Error al reenviar mensaje a la sala");
-     }
- }
+/**
+ * Reenvía un mensaje a la cola de una sala específica.
+ * @param indice_sala El índice de la sala.
+ * @param msg El mensaje a reenviar.
+ */
+void enviar_a_todos_en_sala(int indice_sala, struct mensaje *msg) {
+    struct sala *s = &salas[indice_sala];
+    // Enviar el mensaje múltiples veces (una por cada usuario en la sala)
+    for (int i = 0; i < s->num_usuarios; i++) {
+        if (msgsnd(s->cola_id, msg, sizeof(struct mensaje) - sizeof(long), 0) == -1) {
+            perror("Error al reenviar mensaje a la sala");
+        }
+    }
+}
  
  /**
   * Crea una nueva sala de chat, incluyendo su propia cola de mensajes.
