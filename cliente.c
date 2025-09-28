@@ -42,8 +42,8 @@ void *recibir_mensajes(void *arg) {
     // Bucle infinito para escuchar mensajes
     while (1) {
         if (cola_sala != -1) {
-            // Intentar recibir un mensaje de la cola de la sala
-            if (msgrcv(cola_sala, &msg, sizeof(struct mensaje) - sizeof(long), 0, 0) != -1) {
+            // Intentar recibir un mensaje de la cola de la sala con timeout
+            if (msgrcv(cola_sala, &msg, sizeof(struct mensaje) - sizeof(long), 0, IPC_NOWAIT) != -1) {
                 // Solo mostrar mensajes de otros usuarios (no los propios)
                 if (strcmp(msg.remitente, nombre_usuario) != 0) {
                     printf("\r%s: %s\n> ", msg.remitente, msg.texto);
@@ -134,6 +134,12 @@ int main(int argc, char *argv[]) {
                 cola_sala = cola_id;
                 printf("Te has unido a la sala: %s\n", sala);
                 strcpy(sala_actual, sala);
+                
+                // Limpiar mensajes residuales de la cola de la sala
+                struct mensaje msg_residual;
+                while (msgrcv(cola_sala, &msg_residual, sizeof(struct mensaje) - sizeof(long), 0, IPC_NOWAIT) != -1) {
+                    // Descartar mensajes residuales
+                }
             } else {
                 printf("Error al unirse: %s\n", msg.texto);
             }
@@ -204,6 +210,12 @@ int main(int argc, char *argv[]) {
             printf("%s\n", msg.texto);
             strcpy(sala_actual, "");
             cola_sala = -1;
+            
+            // Limpiar mensajes residuales de la cola anterior
+            struct mensaje msg_residual;
+            while (msgrcv(cola_global, &msg_residual, sizeof(struct mensaje) - sizeof(long), 0, IPC_NOWAIT) != -1) {
+                // Descartar mensajes residuales
+            }
         }
         // Cualquier otro texto se considera un mensaje de chat
         else if (strlen(comando) > 0) {
