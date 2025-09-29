@@ -12,6 +12,7 @@
 #include <sys/ipc.h>
 #include <sys/msg.h>
 #include <unistd.h>
+#include <time.h>
 
 // Constantes del sistema
 #define MAX_SALAS 10
@@ -172,10 +173,15 @@ void enviar_a_todos_en_sala(int indice_sala, struct mensaje *msg) {
 int crear_sala(const char *nombre) {
     if (num_salas >= MAX_SALAS) return -1;
     
-    // Generar una clave única para la cola de esta sala
-    key_t key = ftok("/tmp", num_salas + 1);
-    int cola_id = msgget(key, IPC_CREAT | 0666);
-    if (cola_id == -1) return -1;
+    // Generar una clave única para la cola de esta sala usando timestamp
+    key_t key = ftok("/tmp", 'B' + num_salas + time(NULL));
+    int cola_id = msgget(key, IPC_CREAT | IPC_EXCL | 0666);
+    if (cola_id == -1) {
+        // Si falla, intentar con una clave diferente
+        key = ftok("/tmp", 'C' + num_salas + getpid());
+        cola_id = msgget(key, IPC_CREAT | IPC_EXCL | 0666);
+        if (cola_id == -1) return -1;
+    }
     
     // Inicializar la estructura de la sala
     strcpy(salas[num_salas].nombre, nombre);
