@@ -93,13 +93,13 @@ Bienvenido, María. Salas disponibles: General, Deportes
 ### Diagramas del Sistema
 
 #### Casos de Uso del Sistema
-![Casos de Uso del Sistema](https://github.com/matiasmm/Parcial2_SistemasOperativos/blob/main/diagramas/casos_de_uso.png)
+![Casos de Uso del Sistema](diagramas/casos_de_uso.png)
 
 #### Flujo: Unirse a una Sala
-![Flujo: Unirse a una Sala](https://github.com/matiasmm/Parcial2_SistemasOperativos/blob/main/diagramas/flujo_unirse_sala.png)
+![Flujo: Unirse a una Sala](diagramas/flujo_unirse_sala.png)
 
 #### Flujo: Enviar Mensaje de Chat
-![Flujo: Enviar Mensaje de Chat](https://github.com/matiasmm/Parcial2_SistemasOperativos/blob/main/diagramas/flujo_enviar_mensaje.png)
+![Flujo: Enviar Mensaje de Chat](diagramas/flujo_enviar_mensaje.png)
 
 ### Componentes Principales
 
