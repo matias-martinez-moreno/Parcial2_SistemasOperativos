@@ -1,5 +1,5 @@
 # Sistema de Chat con Colas de Mensajes
-
+# Matías Martínez, Sofía Gallo, Juan Manuel Gallo
 
 ## Estructura del Proyecto
 
@@ -126,4 +126,18 @@ Bienvenido, María. Salas disponibles: General, Deportes
 5. Cliente envía mensajes a la cola global
 6. Servidor reenvía mensajes a la cola de la sala
 7. Todos los clientes de la sala reciben el mensaje
+
+## Arquitectura Técnica
+
+Este sistema implementa una **arquitectura cliente-servidor distribuida** utilizando **colas de mensajes System V** como mecanismo de comunicación entre procesos (IPC). La arquitectura se basa en el patrón **pub-sub** donde el servidor actúa como intermediario central que gestiona múltiples salas de chat independientes.
+
+**Características clave de la implementación:**
+
+- **Aislamiento por salas**: Cada sala tiene su propia cola de mensajes única, garantizando que los mensajes no se mezclen entre diferentes conversaciones
+- **Concurrencia**: El cliente utiliza hilos POSIX (`pthread`) para recibir mensajes de forma asíncrona mientras el usuario escribe
+- **Gestión dinámica**: Las salas se crean automáticamente cuando el primer usuario se une, y se mantienen activas mientras tengan usuarios
+- **Robustez**: El sistema maneja errores como nombres duplicados, salas llenas, y conexiones perdidas
+- **Escalabilidad**: Soporta hasta 10 salas simultáneas con 20 usuarios por sala (configurable)
+
+La implementación utiliza **claves únicas generadas con timestamp y PID** para evitar colisiones en las colas de mensajes, asegurando que cada sala tenga su propio espacio de comunicación aislado.
 
