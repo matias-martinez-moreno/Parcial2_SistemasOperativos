@@ -93,13 +93,13 @@ Bienvenido, María. Salas disponibles: General, Deportes
 ### Diagramas del Sistema
 
 #### Casos de Uso del Sistema
-![Casos de Uso del Sistema](diagramas/casos_de_uso.png)
+![Casos de Uso del Sistema](./diagramas/casos_de_uso.png)
 
 #### Flujo: Unirse a una Sala
-![Flujo: Unirse a una Sala](diagramas/flujo_unirse_sala.png)
+![Flujo: Unirse a una Sala](./diagramas/flujo_unirse_sala.png)
 
 #### Flujo: Enviar Mensaje de Chat
-![Flujo: Enviar Mensaje de Chat](diagramas/flujo_enviar_mensaje.png)
+![Flujo: Enviar Mensaje de Chat](./diagramas/flujo_enviar_mensaje.png)
 
 ### Componentes Principales
 
@@ -127,17 +127,18 @@ Bienvenido, María. Salas disponibles: General, Deportes
 6. Servidor reenvía mensajes a la cola de la sala
 7. Todos los clientes de la sala reciben el mensaje
 
-## Arquitectura Técnica
+## Cómo Funciona el Sistema
 
-Este sistema implementa una **arquitectura cliente-servidor distribuida** utilizando **colas de mensajes System V** como mecanismo de comunicación entre procesos (IPC). La arquitectura se basa en el patrón **pub-sub** donde el servidor actúa como intermediario central que gestiona múltiples salas de chat independientes.
+Este chat funciona como **WhatsApp pero para la terminal**. El servidor es como el "cerebro" que maneja todo, y los clientes son como los celulares que se conectan.
 
-**Características clave de la implementación:**
+**Lo que hace especial a nuestro código:**
 
-- **Aislamiento por salas**: Cada sala tiene su propia cola de mensajes única, garantizando que los mensajes no se mezclen entre diferentes conversaciones
-- **Concurrencia**: El cliente utiliza hilos POSIX (`pthread`) para recibir mensajes de forma asíncrona mientras el usuario escribe
-- **Gestión dinámica**: Las salas se crean automáticamente cuando el primer usuario se une, y se mantienen activas mientras tengan usuarios
-- **Robustez**: El sistema maneja errores como nombres duplicados, salas llenas, y conexiones perdidas
-- **Escalabilidad**: Soporta hasta 10 salas simultáneas con 20 usuarios por sala (configurable)
+- **Cada sala es independiente**: Como tener grupos separados de WhatsApp, cada uno con su propia "conversación"
+- **Mensajes en tiempo real**: Usamos hilos para que puedas escribir y recibir mensajes al mismo tiempo
+- **Se crean salas automáticamente**: Si escribes "join Musica" y no existe, se crea sola
+- **No se mezclan los mensajes**: Cada sala tiene su propia "caja de mensajes" separada
+- **Maneja errores**: Si alguien ya tiene tu nombre o la sala está llena, te avisa
 
-La implementación utiliza **claves únicas generadas con timestamp y PID** para evitar colisiones en las colas de mensajes, asegurando que cada sala tenga su propio espacio de comunicación aislado.
+**Lo técnico que aprendimos:**
+Usamos colas de mensajes de Linux (como buzones de correo entre programas) y cada sala tiene su propio buzón único para que los mensajes no se confundan. También usamos hilos para que puedas chatear sin que se "cuelgue" el programa.
 
