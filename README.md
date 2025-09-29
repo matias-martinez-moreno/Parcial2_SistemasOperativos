@@ -142,3 +142,5 @@ Este chat funciona como **WhatsApp pero para la terminal**. El servidor es como 
 **Lo técnico que aprendimos:**
 Usamos colas de mensajes de Linux (como buzones de correo entre programas) y cada sala tiene su propio buzón único para que los mensajes no se confundan. También usamos hilos para que puedas chatear sin que se "cuelgue" el programa.
 
+**Video de la ejecución:**
+[Video:](https://eafit-my.sharepoint.com/:v:/g/personal/sgallol2_eafit_edu_co/EUTZCk0FKcFFtCloOzwbuMcB7pkUBkwwK9SGHoJr7UfDCw?e=y0JSG2&nav=eyJyZWZlcnJhbEluZm8iOnsicmVmZXJyYWxBcHAiOiJTdHJlYW1XZWJBcHAiLCJyZWZlcnJhbFZpZXciOiJTaGFyZURpYWxvZy1MaW5rIiwicmVmZXJyYWxBcHBQbGF0Zm9ybSI6IldlYiIsInJlZmVycmFsTW9kZSI6InZpZXcifX0%3D)
