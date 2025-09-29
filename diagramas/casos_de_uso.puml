@@ -1,0 +1,35 @@
+@startuml casos_de_uso
+title Casos de Uso del Sistema
+
+left to right direction
+
+actor Usuario as U
+actor Sistema as S
+
+rectangle "Sistema de Chat" {
+  usecase "Unirse a Sala" as UC1
+  usecase "Enviar Mensaje" as UC2
+  usecase "Recibir Mensajes" as UC3
+  usecase "Listar Salas" as UC4
+  usecase "Listar Usuarios" as UC5
+  usecase "Abandonar Sala" as UC6
+  usecase "Gestionar Usuarios" as UC7
+  usecase "Crear Sala" as UC8
+  usecase "Reenviar Mensajes" as UC9
+}
+
+U --> UC1
+U --> UC2
+U --> UC3
+U --> UC4
+U --> UC5
+U --> UC6
+
+S --> UC7
+S --> UC9
+
+UC1 ..> UC8 : incluye
+UC2 ..> UC9 : incluye
+UC3 ..> UC9 : incluye
+
+@enduml

@@ -1,0 +1,17 @@
+@startuml flujo_enviar_mensaje
+title Flujo: Enviar Mensaje de Chat
+
+participant "Cliente María" as CM
+participant "Cola Global" as CG
+participant "Servidor" as S
+participant "Sala General" as SG
+participant "Cliente Juan" as CJ
+
+CM -> CG : 1. MSG "Hola Juan"
+CG -> S : 2. Procesar mensaje
+S -> SG : 3. Buscar sala "General"
+S -> SG : 4. Reenviar a cola de sala
+SG -> CM : 5. Mensaje (descartado)
+SG -> CJ : 6. "María: Hola Juan"
+
+@enduml

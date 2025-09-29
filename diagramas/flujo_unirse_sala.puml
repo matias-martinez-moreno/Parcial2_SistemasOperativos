@@ -1,0 +1,23 @@
+@startuml flujo_unirse_sala
+title Flujo: Unirse a una Sala
+
+participant "Cliente María" as CM
+participant "Cola Global" as CG
+participant "Servidor" as S
+participant "Sala General" as SG
+
+CM -> CG : 1. JOIN 'General'
+CG -> S : 2. Procesar solicitud
+S -> S : 3. ¿Existe sala?
+
+alt [Sala no existe]
+    S -> S : 4. Crear sala
+    S -> S : 5. Generar cola ID
+    S -> SG : 6. Agregar usuario
+end
+
+S -> CM : 7. Respuesta: Cola ID = 1
+CM -> CM : 8. Te has unido a la sala
+CM -> SG : 9. Conectar a cola de sala
+
+@enduml
