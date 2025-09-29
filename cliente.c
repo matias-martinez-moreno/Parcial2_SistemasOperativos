@@ -110,6 +110,12 @@ int main(int argc, char *argv[]) {
             char sala[MAX_NOMBRE];
             sscanf(comando, "join %s", sala);
             
+            // Verificar si ya está en una sala
+            if (strlen(sala_actual) > 0) {
+                printf("Ya estás en la sala '%s'. Debes abandonarla primero con '/leave' antes de unirte a otra sala.\n", sala_actual);
+                continue;
+            }
+            
             // Preparar mensaje de JOIN
             msg.mtype = 1;
             strcpy(msg.remitente, nombre_usuario);
@@ -141,7 +147,12 @@ int main(int argc, char *argv[]) {
                     // Descartar mensajes residuales
                 }
             } else {
-                printf("Error al unirse: %s\n", msg.texto);
+                // Verificar si es un mensaje de error
+                if (strstr(msg.texto, "Error:") != NULL) {
+                    printf("Error al unirse: %s\n", msg.texto);
+                } else {
+                    printf("Error al unirse: %s\n", msg.texto);
+                }
             }
         }
         // Comando "/list" - listar salas disponibles
